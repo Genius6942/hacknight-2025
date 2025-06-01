@@ -26,7 +26,12 @@ export interface AppCity {
   riskCategory?: CityRiskCategory;
 }
 
-export type ViewMode = "coastal" | "temperature" | "climate_change" | "temp_anomaly"; // Added "temp_anomaly"
+export type ViewMode =
+  | "coastal"
+  | "temperature"
+  | "climate_change"
+  | "temp_anomaly"
+  | "emissions"; // Added "emissions"
 
 export type CityRiskCategory = "submerged" | "at_risk" | "low_risk";
 
@@ -76,3 +81,34 @@ export interface TemperatureAnomalyDataPoint {
     [key: string]: TemperatureAnomalyPeriodData;
   };
 }
+
+export interface EmissionDataRow {
+  IPCC_annex: string;
+  C_group_IM24_sh: string;
+  Country_code_A3: string;
+  Name: string;
+  ipcc_code_2006_for_standard_report: string;
+  ipcc_code_2006_for_standard_report_name: string; // Sector name
+  Substance: string;
+  fossil_bio: string;
+  [yearKey: string]: string | number; // For Y_YYYY fields
+}
+
+export interface SectorEmission {
+  sectorName: string;
+  value: number;
+}
+
+export interface YearlyEmissions {
+  year: number;
+  total: number;
+  sectors: SectorEmission[];
+}
+
+export interface CountryEmissionsData {
+  countryCodeA3: string;
+  countryName: string;
+  emissionsByYear: Map<number, YearlyEmissions>;
+}
+
+export type ProcessedEmissionsData = Map<string, CountryEmissionsData>; // Keyed by Country_code_A3

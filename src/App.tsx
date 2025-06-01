@@ -1,9 +1,14 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import type { GlobeMethods } from "react-globe.gl";
 import { useClimateData } from "./hooks/useClimateData";
 import citiesRawData from "./data/cities.json";
-import type { LineFeatureCollection, LineStringFeature } from "./types";
-import type { AppCity, GeoJsonFeature, ViewMode, CityRiskCategory } from "./types";
+import type {
+  AppCity,
+  GeoJsonFeature,
+  ViewMode,
+  CityRiskCategory,
+  LineStringFeature,
+} from "./types";
 import {
   calculateDistance,
   getTemperatureColor,
@@ -31,48 +36,76 @@ function App() {
   const [comparisonPeriod, setComparisonPeriod] = useState<string>("2081-2100");
   const [isPlaying, setIsPlaying] = useState(false);
   const [showStats, setShowStats] = useState(true);
+  const [selectedEmissionYear, setSelectedEmissionYear] = useState<number | null>(null);
+  const [countries, setCountries] = useState<GeoJsonFeature[]>([]); // For country polygons
+  const [selectedCountryIsoA3, setSelectedCountryIsoA3] = useState<string | null>(null); // New state for selected country
 
   const {
     climateData,
     landBoundaries,
     temperatureAnomalyData,
+    emissionsData,
+    emissionYears,
     loading: climateLoading,
     error: climateError,
     progress,
     timePeriods,
     getTemperatureAtLocation,
     getTemperatureChange,
+    getEmissionsForYear,
+    getCountryEmissionDetails,
   } = useClimateData();
 
+  // Initialize selectedEmissionYear when emissionYears are loaded
+  useEffect(() => {
+    if (emissionYears && emissionYears.length > 0 && selectedEmissionYear === null) {
+      setSelectedEmissionYear(emissionYears[0]);
+    }
+  }, [emissionYears, selectedEmissionYear]);
+
+  // Effect to load country polygon data (e.g., countries.geojson)
+  useEffect(() => {
+    fetch("/data/countries.geojson") // Assuming this is the path to your country polygons
+      .then((res) => res.json())
+      .then((data) => {
+        setCountries(data.features);
+      })
+      .catch((err) => console.error("Error loading countries.geojson:", err));
+  }, []);
+
   // computeDistanceToCoast remains the same
-  const computeDistanceToCoast = (
-    city: Omit<AppCity, "distanceToCoast">,
-    coastlineFeatures: LineStringFeature[]
-  ): number => {
-    let minDistance = Infinity;
-    coastlineFeatures.forEach((feature: any) => {
-      const geometry = feature.geometry;
-      const coords = geometry.coordinates;
+  const computeDistanceToCoast = useMemo(
+    () =>
+      (
+        city: Omit<AppCity, "distanceToCoast">,
+        coastlineFeatures: LineStringFeature[]
+      ): number => {
+        let minDistance = Infinity;
+        coastlineFeatures.forEach((feature: any) => {
+          const geometry = feature.geometry;
+          const coords = geometry.coordinates;
 
-      const processLineString = (lineCoords: number[][]) => {
-        for (const coord of lineCoords) {
-          const shoreLng = coord[0];
-          const shoreLat = coord[1];
-          const dist = calculateDistance(city.lat, city.lng, shoreLat, shoreLng);
-          if (dist < minDistance) minDistance = dist;
-        }
-      };
+          const processLineString = (lineCoords: number[][]) => {
+            for (const coord of lineCoords) {
+              const shoreLng = coord[0];
+              const shoreLat = coord[1];
+              const dist = calculateDistance(city.lat, city.lng, shoreLat, shoreLng);
+              if (dist < minDistance) minDistance = dist;
+            }
+          };
 
-      if (geometry.type === "LineString") {
-        processLineString(coords as number[][]);
-      } else if (geometry.type === "MultiLineString") {
-        (coords as number[][][]).forEach((lineString) => {
-          processLineString(lineString);
+          if (geometry.type === "LineString") {
+            processLineString(coords as number[][]);
+          } else if (geometry.type === "MultiLineString") {
+            (coords as number[][][]).forEach((lineString) => {
+              processLineString(lineString);
+            });
+          }
         });
-      }
-    });
-    return isFinite(minDistance) ? minDistance : 0;
-  };
+        return isFinite(minDistance) ? minDistance : 0;
+      },
+    []
+  );
 
   useEffect(() => {
     if (!landBoundaries) return;
@@ -98,7 +131,7 @@ function App() {
       globeEl.current.controls().autoRotate = false;
       globeEl.current.controls().autoRotateSpeed = 0.2;
     }
-  }, [landBoundaries]);
+  }, [landBoundaries, computeDistanceToCoast]);
 
   // Auto-play animation for time periods
   useEffect(() => {
@@ -115,31 +148,34 @@ function App() {
     return () => clearInterval(interval);
   }, [isPlaying, timePeriods]);
 
-  const getDynamicLabelSize = () => {
+  const getDynamicLabelSize = useCallback(() => {
     const baseSize = 0.6;
     const minSize = 0;
     const maxSize = 1.0;
     const scaleFactor = Math.max(0.3, Math.min(1.5, cameraAltitude / 1.5));
     const dynamicSize = baseSize * scaleFactor;
     return Math.max(minSize, Math.min(maxSize, dynamicSize));
-  };
+  }, [cameraAltitude]);
 
-  const getCityRiskCategory = (city: AppCity): CityRiskCategory => {
-    if (city.distanceToCoast <= riskThresholdMiles) {
-      return "submerged";
-    }
-    if (city.distanceToCoast <= riskThresholdMiles + 10) {
-      return "at_risk";
-    }
-    return "low_risk";
-  };
+  const getCityRiskCategory = useCallback(
+    (city: AppCity): CityRiskCategory => {
+      if (city.distanceToCoast <= riskThresholdMiles) {
+        return "submerged";
+      }
+      if (city.distanceToCoast <= riskThresholdMiles + 10) {
+        return "at_risk";
+      }
+      return "low_risk";
+    },
+    [riskThresholdMiles]
+  );
 
   const citiesWithRiskCategory = useMemo(() => {
     return cities.map((city) => ({
       ...city,
       riskCategory: getCityRiskCategory(city),
     }));
-  }, [cities, riskThresholdMiles]);
+  }, [cities, getCityRiskCategory]);
 
   const highRiskCities = useMemo(() => {
     return citiesWithRiskCategory.filter(
@@ -148,48 +184,46 @@ function App() {
   }, [citiesWithRiskCategory]);
 
   const globePointsData = useMemo(() => {
-    if (viewMode === "climate_change") {
-      if (!temperatureAnomalyData || temperatureAnomalyData.length === 0) return [];
-      return temperatureAnomalyData.map((point: any) => ({
-        ...point,
-        color: getPointColor(point.diff),
-        altitude: getPointAltitude(point.diff),
-        size: 0.1,
-      }));
+    if (viewMode === "temperature") {
+      if (!climateData || Object.keys(climateData).length === 0) return [];
+      return cities.map((city) => {
+        const temp = getTemperatureAtLocation(city.lat, city.lng, currentPeriod);
+        return {
+          ...city,
+          lat: city.lat,
+          lng: city.lng,
+          temperature: temp,
+          color: getTemperatureColor(temp),
+          size: getPointSize(temp),
+        };
+      });
     }
-
-    if (!climateData || Object.keys(climateData).length === 0) return [];
-    return cities.map((city) => {
-      const temp = getTemperatureAtLocation(city.lat, city.lng, currentPeriod);
-      return {
-        ...city,
-        lat: city.lat,
-        lng: city.lng,
-        temperature: temp,
-        color: getTemperatureColor(temp),
-        size: getPointSize(temp),
-      };
-    });
+    return []; // Default for other modes or if data not ready
   }, [
     cities,
     currentPeriod,
+    comparisonPeriod, // Added
     climateData,
     getTemperatureAtLocation,
     viewMode,
     temperatureAnomalyData,
+    getPointColor, // Added
+    getPointAltitude, // Added
   ]);
 
   const stats = useMemo(() => {
-    if (globePointsData.length === 0) return null;
+    if (viewMode !== "temperature" || globePointsData.length === 0) return null;
     const temps = globePointsData
-      .map((d) => d.temperature)
-      .filter((t) => t !== undefined && t !== null && !isNaN(t)) as number[];
+      .map((d: any) => d.temperature) // d is GlobePoint which has temperature
+      .filter(
+        (t?: number | null) => t !== undefined && t !== null && !isNaN(t)
+      ) as number[];
     if (temps.length === 0) return null;
     const min = Math.min(...temps);
     const max = Math.max(...temps);
     const avg = temps.reduce((sum, t) => sum + t, 0) / temps.length;
     return { min, max, avg, count: temps.length };
-  }, [globePointsData]);
+  }, [globePointsData, viewMode]);
 
   const citiesWithRealTemp = useMemo(() => {
     return cities.map((city) => {
@@ -203,8 +237,8 @@ function App() {
       const change = getTemperatureChange(
         city.lat,
         city.lng,
-        currentPeriod,
-        comparisonPeriod
+        currentPeriod, // Base period for change calculation
+        comparisonPeriod // Target period for change calculation
       );
       return { ...city, tempChange: change };
     });
@@ -216,6 +250,18 @@ function App() {
       return temp !== null && temp !== undefined && isTemperatureExtreme(temp);
     });
   }, [citiesWithRealTemp]);
+
+  // Reset selected country when viewMode changes or selected year changes
+  useEffect(() => {
+    setSelectedCountryIsoA3(null);
+  }, [viewMode, selectedEmissionYear]);
+
+  const totalGlobalEmissionsForYear = useMemo(() => {
+    if (viewMode !== "emissions" || !getEmissionsForYear || !selectedEmissionYear)
+      return 0;
+    const yearEmissions = getEmissionsForYear(selectedEmissionYear);
+    return Array.from(yearEmissions.values()).reduce((sum, val) => sum + (val || 0), 0);
+  }, [viewMode, getEmissionsForYear, selectedEmissionYear]);
 
   if (climateLoading) {
     return (
@@ -303,25 +349,45 @@ function App() {
         stats={stats}
         timePeriods={timePeriods}
         getPointColor={getPointColor}
+        // Emissions props
+        selectedEmissionYear={selectedEmissionYear}
+        setSelectedEmissionYear={setSelectedEmissionYear}
+        emissionYears={emissionYears}
+        // New props for country details display
+        selectedCountryIsoA3={selectedCountryIsoA3}
+        countries={countries} // Pass country features for name lookup
+        getCountryEmissionDetails={getCountryEmissionDetails}
+        getTotalGlobalEmissionsForYear={() => totalGlobalEmissionsForYear}
+				onCountrySelect={setSelectedCountryIsoA3} // New prop to handle country selection
       />
       <GlobeDisplay
         globeEl={globeEl}
         windowDimensions={windowDimensions}
         viewMode={viewMode}
         coastlines={coastlines}
-        cities={citiesWithRiskCategory}
+        cities={citiesWithRiskCategory} // For coastal/temp modes if still needed
+        // Pass other relevant data for existing modes
         citiesWithRealTemp={citiesWithRealTemp}
         citiesWithTempChange={citiesWithTempChange}
         getDynamicLabelSize={getDynamicLabelSize}
-        getCityRiskCategory={getCityRiskCategory}
+        // getCityRiskCategory={getCityRiskCategory} // Already applied in citiesWithRiskCategory
         getTemperatureColor={getTemperatureColor}
         getTemperatureChangeColor={getTemperatureChangeColor}
-        pointsData={globePointsData}
-        currentPeriod={currentPeriod}
-        temperatureAnomalyData={temperatureAnomalyData}
-        selectedAnomalyComparisonPeriod={comparisonPeriod}
-        getPointColor={getPointColor}
-        getPointAltitude={getPointAltitude}
+        pointsData={globePointsData} // For temperature/anomaly modes
+        currentPeriod={currentPeriod} // For temperature mode
+        temperatureAnomalyData={temperatureAnomalyData} // For anomaly mode
+        selectedAnomalyComparisonPeriod={comparisonPeriod} // For anomaly mode
+        getPointColor={getPointColor} // For anomaly mode
+        getPointAltitude={getPointAltitude} // For anomaly mode
+        // Emissions specific props
+        countries={countries}
+        emissionsData={emissionsData} // This might still be useful for direct access if needed, or can be removed if only getEmissionsForYear is used
+        selectedEmissionYear={selectedEmissionYear}
+        getEmissionsForYear={getEmissionsForYear}
+        getCountryEmissionDetails={getCountryEmissionDetails} // Keep for direct use if any, though primary use is now in Sidebar
+        emissionYears={emissionYears} // Keep for context if needed
+        // New prop for handling country click
+        onCountrySelect={setSelectedCountryIsoA3}
       />
       {isPlaying && climateLoading && (
         <div

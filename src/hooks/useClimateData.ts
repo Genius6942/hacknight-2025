@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import Papa from "papaparse";
 
 // Interface for a single data point from climate_data_for_globe.json
 interface ClimatePoint {
@@ -9,7 +10,15 @@ interface ClimatePoint {
   [key: string]: number | [number, number];
 }
 
-import type { LineFeatureCollection, TemperatureAnomalyDataPoint } from "../types"; // Added TemperatureAnomalyDataPoint
+import type {
+  LineFeatureCollection,
+  TemperatureAnomalyDataPoint,
+  EmissionDataRow,
+  ProcessedEmissionsData,
+  CountryEmissionsData,
+  YearlyEmissions,
+  SectorEmission,
+} from "../types"; // Added EmissionDataRow and ProcessedEmissionsData
 
 export const useClimateData = () => {
   const [climateData, setClimateData] = useState<ClimatePoint[]>([]);
@@ -18,7 +27,9 @@ export const useClimateData = () => {
   );
   const [temperatureAnomalyData, setTemperatureAnomalyData] = useState<
     TemperatureAnomalyDataPoint[]
-  >([]); // New state for anomaly data
+  >([]);
+  const [emissionsData, setEmissionsData] = useState<ProcessedEmissionsData | null>(null); // New state for emissions data
+  const [emissionYears, setEmissionYears] = useState<number[]>([]); // New state for available years in emissions data
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0); // Add progress state
@@ -32,6 +43,75 @@ export const useClimateData = () => {
     }
     fetched.current = true;
 
+    const parseAndProcessEmissions = (
+      csvText: string
+    ): { processedData: ProcessedEmissionsData; years: number[] } => {
+      const parseResult = Papa.parse<EmissionDataRow>(csvText, {
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+      });
+
+      const data: ProcessedEmissionsData = new Map();
+      const yearSet = new Set<number>();
+
+      parseResult.data.forEach((row) => {
+        if (!row.Country_code_A3 || !row.Name) return;
+
+        const countryCode = row.Country_code_A3;
+        let countryData = data.get(countryCode);
+        if (!countryData) {
+          countryData = {
+            countryCodeA3: countryCode,
+            countryName: row.Name,
+            emissionsByYear: new Map<number, YearlyEmissions>(),
+          };
+          data.set(countryCode, countryData);
+        }
+
+        Object.keys(row).forEach((key) => {
+          if (key.startsWith("Y_")) {
+            const year = parseInt(key.substring(2));
+            if (
+              !isNaN(year) &&
+              row[key] !== null &&
+              row[key] !== undefined &&
+              row[key] !== ""
+            ) {
+              yearSet.add(year);
+              let yearlyData = countryData!.emissionsByYear.get(year);
+              if (!yearlyData) {
+                yearlyData = {
+                  year: year,
+                  total: 0,
+                  sectors: [],
+                };
+                countryData!.emissionsByYear.set(year, yearlyData);
+              }
+
+              const emissionValue = Number(row[key]);
+              if (!isNaN(emissionValue)) {
+                yearlyData.total += emissionValue;
+
+                const sectorName =
+                  row.ipcc_code_2006_for_standard_report_name || "Unknown Sector";
+                let sectorEntry = yearlyData.sectors.find(
+                  (s) => s.sectorName === sectorName
+                );
+                if (sectorEntry) {
+                  sectorEntry.value += emissionValue;
+                } else {
+                  yearlyData.sectors.push({ sectorName, value: emissionValue });
+                }
+              }
+            }
+          }
+        });
+      });
+      const sortedYears = Array.from(yearSet).sort((a, b) => a - b);
+      return { processedData: data, years: sortedYears };
+    };
+
     const loadDataWithProgress = async <T>(
       url: string,
       onProgress: (loaded: number, total: number) => void
@@ -40,6 +120,14 @@ export const useClimateData = () => {
       if (!response.ok) throw new Error(`Failed to load ${url}`);
       if (!response.body) throw new Error("Response body is null");
       const contentLength = Number(response.headers.get("Content-Length") || "0");
+
+      if (url.endsWith(".csv")) {
+        // Handle CSV differently for now, or adapt progress if needed
+        const text = await response.text();
+        onProgress(1, 1); // Simulate completion for progress tracking
+        return { data: text as any, total: text.length }; // Casting to any, actual type handled by parser
+      }
+
       if (contentLength === 0) {
         // No length header: fetch whole JSON at once and skip progress
         const json = await response.json();
@@ -74,32 +162,42 @@ export const useClimateData = () => {
       try {
         setLoading(true);
         setProgress(0);
+        const numFiles = 4; // Adjusted for four files now
 
         const { data: climateJson, total: climateTotal } = await loadDataWithProgress<
           ClimatePoint[]
-        >(
-          "/data/climate_data_for_globe.json",
-          (loaded, total) => setProgress(loaded / (total * 3)) // Adjusted for three files
+        >("/data/climate_data_for_globe.json", (loaded, total) =>
+          setProgress(loaded / (total * numFiles))
         );
         setClimateData(climateJson);
-        if (climateTotal === 0) setProgress(1 / 3);
+        if (climateTotal === 0) setProgress(1 / numFiles);
 
         const { data: boundaryJson, total: boundaryTotal } =
           await loadDataWithProgress<LineFeatureCollection>(
             "/data/allLandBoundaries.json",
-            (loaded, total) => setProgress(1 / 3 + loaded / (total * 3)) // Adjusted for three files
+            (loaded, total) => setProgress(1 / numFiles + loaded / (total * numFiles))
           );
         setLandBoundaries(boundaryJson);
-        if (boundaryTotal === 0) setProgress(2 / 3);
+        if (boundaryTotal === 0) setProgress(2 / numFiles);
 
         const { data: anomalyJson, total: anomalyTotal } = await loadDataWithProgress<
           TemperatureAnomalyDataPoint[]
-        >(
-          "/data/temperature_data.json", // Path to the new data file
-          (loaded, total) => setProgress(2 / 3 + loaded / (total * 3)) // Adjusted for three files
+        >("/data/temperature_data.json", (loaded, total) =>
+          setProgress(2 / numFiles + loaded / (total * numFiles))
         );
         setTemperatureAnomalyData(anomalyJson);
-        if (anomalyTotal === 0) setProgress(1);
+        if (anomalyTotal === 0) setProgress(3 / numFiles);
+
+        // Load Emissions Data
+        const { data: emissionsCsvText, total: emissionsTotal } =
+          await loadDataWithProgress<string>("/data/emissions.csv", (loaded, total) =>
+            setProgress(3 / numFiles + loaded / (total * numFiles))
+          );
+        const { processedData: parsedEmissionsData, years: parsedEmissionYears } =
+          parseAndProcessEmissions(emissionsCsvText);
+        setEmissionsData(parsedEmissionsData);
+        setEmissionYears(parsedEmissionYears);
+        if (emissionsTotal === 0) setProgress(1); // Or handle if it was already 1
 
         setLoading(false);
         setProgress(1); // Ensure progress is 100% at the end
@@ -171,15 +269,42 @@ export const useClimateData = () => {
     return toTemp - fromTemp;
   };
 
+  const getEmissionsForYear = (year: number): Map<string, number> => {
+    const yearlyEmissionsMap = new Map<string, number>();
+    if (!emissionsData) return yearlyEmissionsMap;
+
+    emissionsData.forEach((countryData) => {
+      const yearData = countryData.emissionsByYear.get(year);
+      if (yearData) {
+        yearlyEmissionsMap.set(countryData.countryCodeA3, yearData.total);
+      }
+    });
+    return yearlyEmissionsMap;
+  };
+
+  const getCountryEmissionDetails = (
+    countryCodeA3: string,
+    year: number
+  ): YearlyEmissions | null => {
+    if (!emissionsData) return null;
+    const countryData = emissionsData.get(countryCodeA3);
+    if (!countryData) return null;
+    return countryData.emissionsByYear.get(year) || null;
+  };
+
   return {
     climateData,
     landBoundaries,
-    temperatureAnomalyData, // Expose new data
+    temperatureAnomalyData,
+    emissionsData, // Expose new emissions data
+    emissionYears, // Expose available emission years
     loading,
     error,
     progress, // Expose progress
     timePeriods,
     getTemperatureAtLocation,
     getTemperatureChange,
+    getEmissionsForYear, // Expose new function
+    getCountryEmissionDetails, // Expose new function
   };
 };
