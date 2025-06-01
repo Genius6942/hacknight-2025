@@ -41,6 +41,7 @@ function App() {
   const [cities, setCities] = useState<AppCity[]>([]);
   const [riskThresholdMiles, setRiskThresholdMiles] = useState<number>(25);
   const [cameraAltitude, setCameraAltitude] = useState<number>(2.5);
+  const cameraChangeTimeoutRef = useRef<number | undefined>(undefined);
   const [viewMode, setViewMode] = useState<ViewMode>("coastal");
 
   // Climate data states
@@ -155,12 +156,20 @@ function App() {
       const onCameraChange = () => {
         if (globeEl.current) {
           const pov = globeEl.current.pointOfView();
-          setCameraAltitude(pov.altitude);
+          if (cameraChangeTimeoutRef.current) {
+            clearTimeout(cameraChangeTimeoutRef.current);
+          }
+          cameraChangeTimeoutRef.current = window.setTimeout(() => {
+            setCameraAltitude(pov.altitude);
+          }, 300);
         }
       };
       controls.addEventListener("change", onCameraChange);
       return () => {
         controls.removeEventListener("change", onCameraChange);
+        if (cameraChangeTimeoutRef.current) {
+          clearTimeout(cameraChangeTimeoutRef.current);
+        }
       };
     }
   }, []);
@@ -168,7 +177,7 @@ function App() {
   // Dynamic label size based on camera altitude
   const getDynamicLabelSize = () => {
     const baseSize = 0.6;
-    const minSize = 0.2;
+    const minSize = 0;
     const maxSize = 1.0;
     const scaleFactor = Math.max(0.3, Math.min(1.5, cameraAltitude / 1.5));
     const dynamicSize = baseSize * scaleFactor;

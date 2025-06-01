@@ -35,7 +35,7 @@ export const useClimateData = () => {
 
         // Load grid format data for each period
         for (const period of timePeriods) {
-          const response = await fetch(`/output/temperature_grid_${period}.json`);
+          const response = await fetch(`/data/temperature_grid_${period}.json`);
           if (!response.ok) {
             throw new Error(`Failed to load data for ${period}`);
           }
