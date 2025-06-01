@@ -31,7 +31,7 @@ function App() {
   const [coastlines, setCoastlines] = useState<LineStringFeature[]>([]);
   const [cities, setCities] = useState<AppCity[]>([]);
   const [riskThresholdMiles, setRiskThresholdMiles] = useState<number>(10);
-  const [viewMode, setViewMode] = useState<ViewMode>("coastal");
+  const [viewMode, setViewMode] = useState<ViewMode>("temp_anomaly");
   const [currentPeriod, setCurrentPeriod] = useState<string>("2021-2040");
   const [comparisonPeriod, setComparisonPeriod] = useState<string>("2081-2100");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -147,15 +147,6 @@ function App() {
     }
     return () => clearInterval(interval);
   }, [isPlaying, timePeriods]);
-
-  const getDynamicLabelSize = useCallback(() => {
-    const baseSize = 0.6;
-    const minSize = 0;
-    const maxSize = 1.0;
-    const scaleFactor = Math.max(0.3, Math.min(1.5, cameraAltitude / 1.5));
-    const dynamicSize = baseSize * scaleFactor;
-    return Math.max(minSize, Math.min(maxSize, dynamicSize));
-  }, [cameraAltitude]);
 
   const getCityRiskCategory = useCallback(
     (city: AppCity): CityRiskCategory => {
@@ -287,6 +278,7 @@ function App() {
             borderRadius: "10px",
             overflow: "hidden",
             border: "1px solid #555",
+						position: "relative"
           }}
         >
           <div
@@ -299,7 +291,7 @@ function App() {
           ></div>
         </div>
         <div style={{ color: "white", fontSize: "14px", marginTop: "10px" }}>
-          {Math.round(progress * 100)}%
+          {Math.min(Math.round(progress * 100), 80)}%
         </div>
       </div>
     );
@@ -369,7 +361,6 @@ function App() {
         // Pass other relevant data for existing modes
         citiesWithRealTemp={citiesWithRealTemp}
         citiesWithTempChange={citiesWithTempChange}
-        getDynamicLabelSize={getDynamicLabelSize}
         // getCityRiskCategory={getCityRiskCategory} // Already applied in citiesWithRiskCategory
         getTemperatureColor={getTemperatureColor}
         getTemperatureChangeColor={getTemperatureChangeColor}

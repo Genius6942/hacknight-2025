@@ -139,46 +139,14 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, [viewMode, selectedEmissionYear, getTotalGlobalEmissionsForYear]);
 
   return (
-    <div className="w-1/5 bg-gray-900 text-white p-4 overflow-y-auto shadow-2xl scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
+    <div className="w-1/4 bg-gray-900 text-white p-4 overflow-y-auto shadow-2xl scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
       {" "}
       {/* Added scrollbar styling */}
       {/* <h2 className="text-2xl font-bold mb-6 text-center">Climate Change Dashboard</h2> */}
       {/* View Mode Selection */}
       <div className="mb-6">
         <label className="block text-sm font-medium mb-2 text-gray-300">View Mode</label>
-        <div className="flex flex-col space-y-2">
-          <button
-            onClick={() => setViewMode("coastal")}
-            className={`px-4 py-2 rounded text-sm font-semibold transition-all duration-150 ease-in-out ${
-              viewMode === "coastal"
-                ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
-                : "bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
-            }`}
-          >
-            Coastal Risk
-          </button>
-          <div className="flex gap-2 items-center">
-            <button
-              onClick={() => setViewMode("temperature")}
-              className={`px-4 py-2 rounded text-sm font-semibold transition-all duration-150 ease-in-out ${
-                viewMode === "temperature"
-                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
-                  : "bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
-              }`}
-            >
-              Global Temperature
-            </button>
-            <button
-              onClick={() => setViewMode("climate_change")}
-              className={`px-4 py-2 rounded text-sm font-semibold transition-all duration-150 ease-in-out ${
-                viewMode === "climate_change"
-                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
-                  : "bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
-              }`}
-            >
-              Temperature Change
-            </button>
-          </div>
+        <div className="flex flex-col space-y-2 relative">
           <button
             onClick={() => setViewMode("temp_anomaly")}
             className={`px-4 py-2 rounded text-sm font-semibold transition-all duration-150 ease-in-out ${
@@ -198,6 +166,38 @@ const Sidebar: React.FC<SidebarProps> = ({
             }`}
           >
             Global Emissions
+          </button>
+          <div className="flex gap-2 items-center w-full">
+            <button
+              onClick={() => setViewMode("temperature")}
+              className={`flex-1 px-4 py-2 rounded text-sm font-semibold transition-all duration-150 ease-in-out ${
+                viewMode === "temperature"
+                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+                  : "bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
+              }`}
+            >
+              Global Temperature
+            </button>
+            <button
+              onClick={() => setViewMode("climate_change")}
+              className={`flex-1 px-4 py-2 rounded text-sm font-semibold transition-all duration-150 ease-in-out ${
+                viewMode === "climate_change"
+                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+                  : "bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
+              }`}
+            >
+              Temperature Change
+            </button>
+          </div>
+          <button
+            onClick={() => setViewMode("coastal")}
+            className={`px-4 py-2 rounded text-sm font-semibold transition-all duration-150 ease-in-out ${
+              viewMode === "coastal"
+                ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+                : "bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
+            }`}
+          >
+            Coastal Risk
           </button>
         </div>
       </div>
@@ -240,6 +240,25 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
       )}
+      {/* Global Emissions Summary Card*/}
+      {viewMode === "emissions" &&
+        selectedEmissionYear &&
+        totalGlobalEmissionsForSelectedYear !== null && (
+          <div className="mb-6 p-4 bg-gray-800 rounded-lg shadow-lg">
+            <h3 className="text-md font-semibold mb-2 text-gray-200 text-center">
+              Global Emissions Summary
+            </h3>
+            <div className="text-center text-sm text-gray-300">
+              Total Emissions for {selectedEmissionYear}:{" "}
+              <span className="font-bold text-green-400">
+                {parseInt(
+                  totalGlobalEmissionsForSelectedYear.toFixed(0)
+                ).toLocaleString()}{" "}
+                MtCO₂e
+              </span>
+            </div>
+          </div>
+        )}
       {/* Country Emission Details Display */}
       {viewMode === "emissions" &&
         selectedCountryIsoA3 &&
@@ -344,25 +363,42 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
       {/* Color Legend */}
-      {(viewMode === "temperature" || viewMode === "climate_change") &&
-        !climateLoading && (
-          <div className="mb-6 p-3 bg-gray-800 rounded-lg shadow-lg">
-            <div className="text-sm mb-2 font-semibold text-gray-300">
-              🌡️ Temperature Scale
-            </div>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-400">-50°C</span>
-              <div
-                className="h-3 flex-1 mx-3 rounded-md shadow-inner"
-                style={{
-                  background:
-                    "linear-gradient(to right, rgb(0,128,255), rgb(0,255,255), rgb(128,255,128), rgb(255,255,0), rgb(255,128,0), rgb(255,0,0))",
-                }}
-              ></div>
-              <span className="text-xs text-gray-400">+50°C</span>
-            </div>
+      {viewMode === "temperature" && !climateLoading && (
+        <div className="mb-6 p-3 bg-gray-800 rounded-lg shadow-lg">
+          <div className="text-sm mb-2 font-semibold text-gray-300">
+            Temperature Scale
           </div>
-        )}
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-gray-400">-50°C</span>
+            <div
+              className="h-3 flex-1 mx-3 rounded-md shadow-inner"
+              style={{
+                background:
+                  "linear-gradient(to right, rgb(0,128,255), rgb(0,255,255), rgb(128,255,128), rgb(255,255,0), rgb(255,128,0), rgb(255,0,0))",
+              }}
+            ></div>
+            <span className="text-xs text-gray-400">+50°C</span>
+          </div>
+        </div>
+      )}
+      {viewMode === "climate_change" && !climateLoading && (
+        <div className="mb-6 p-3 bg-gray-800 rounded-lg shadow-lg">
+          <div className="text-sm mb-2 font-semibold text-gray-300">
+            Temperature Scale
+          </div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-gray-400">-2°C</span>
+            <div
+              className="h-3 flex-1 mx-3 rounded-md shadow-inner"
+              style={{
+                background:
+                  "linear-gradient(to right, rgb(0,128,255), rgb(0,255,255), rgb(128,255,128), rgb(255,255,0), rgb(255,128,0), rgb(255,0,0))",
+              }}
+            ></div>
+            <span className="text-xs text-gray-400">+2°C</span>
+          </div>
+        </div>
+      )}
       {/* Temperature Anomaly Color Legend */}
       {viewMode === "temp_anomaly" && !climateLoading && (
         <div className="mb-6 p-3 bg-gray-800 rounded-lg shadow-lg">

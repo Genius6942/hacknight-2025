@@ -27,7 +27,6 @@ interface GlobeDisplayProps {
   cities: AppCity[];
   citiesWithRealTemp: AppCity[];
   citiesWithTempChange: AppCity[];
-  getDynamicLabelSize: () => number;
   getTemperatureColor: (temp: number | undefined | null) => string;
   getTemperatureChangeColor: (change: number) => string;
   pointsData: GlobePoint[];
@@ -56,7 +55,6 @@ const GlobeDisplay: React.FC<GlobeDisplayProps> = ({
   cities,
   citiesWithRealTemp,
   citiesWithTempChange,
-  getDynamicLabelSize,
   getTemperatureColor,
   getTemperatureChangeColor,
   pointsData,
@@ -157,10 +155,10 @@ const GlobeDisplay: React.FC<GlobeDisplayProps> = ({
   };
 
   return (
-    <div className="w-4/5 h-full relative">
+    <div className="w-3/4 h-full relative">
       <Globe
         ref={globeEl}
-        width={(windowDimensions.width * 4) / 5}
+        width={(windowDimensions.width * 3) / 4}
         height={windowDimensions.height}
         globeImageUrl={
           viewMode === "temp_anomaly" || viewMode === "emissions"
@@ -242,26 +240,25 @@ const GlobeDisplay: React.FC<GlobeDisplayProps> = ({
           }
           return city.name;
         }}
-        labelSize={getDynamicLabelSize()} // Use the dynamic label size
+        labelSize={0.4}
         labelDotRadius={0.3}
         labelResolution={2}
         labelColor={(d) => {
           const city = d as AppCity;
           if (viewMode === "coastal") {
-            if (city.riskCategory === "submerged") return "#ff4d4d";
-            if (city.riskCategory === "at_risk") return "#ffc107";
+            const riskCategory = city.riskCategory;
+            if (riskCategory === "submerged") return "#ff4d4d";
+            if (riskCategory === "at_risk") return "#ffc107";
             return "#4caf50";
           } else if (viewMode === "temperature") {
             const temp = city.realTemp;
             return temp !== null && temp !== undefined
-              ? (pointsData.find((p) => p.id === city.id)?.color as string) ||
-                  "rgba(200, 200, 200, 0.7)"
+              ? getTemperatureColor(temp)
               : "rgba(200, 200, 200, 0.7)";
           } else if (viewMode === "climate_change") {
             const change = city.tempChange;
             return change !== null && change !== undefined
-              ? (pointsData.find((p) => p.id === city.id)?.color as string) ||
-                  "rgba(200, 200, 200, 0.7)"
+              ? getTemperatureChangeColor(change)
               : "rgba(200, 200, 200, 0.7)";
           }
           return "yellow";
