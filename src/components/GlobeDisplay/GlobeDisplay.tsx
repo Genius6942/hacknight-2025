@@ -185,10 +185,8 @@ const GlobeDisplay: React.FC<GlobeDisplayProps> = ({
         pointLat={(d) => (d as GlobePoint).lat}
         pointLng={(d) => (d as GlobePoint).lng}
         pointColor={(d: any) => d.color}
-        pointAltitude={(d: any) => (viewMode === "temp_anomaly" ? d.altitude : 0.01)}
-        pointRadius={(d: any) =>
-          viewMode === "temp_anomaly" ? 0.2 : (d as GlobePoint).size
-        }
+        pointAltitude={(d: any) => (viewMode === "temp_anomaly" ? d.altitude : 0)}
+        pointRadius={(d: any) => (viewMode === "temp_anomaly" ? 0.2 : 0.2)}
         pointLabel={(d: any) => {
           if (viewMode === "temp_anomaly") {
             return d.label;

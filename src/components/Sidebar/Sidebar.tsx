@@ -314,6 +314,32 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         )}
+      {/* Comparison Period Slider - only if viewMode is climate_change */}
+      {viewMode === "climate_change" && !climateLoading && allTimePeriods.length > 0 && (
+        <div className="my-6 p-4 bg-gray-800 rounded-lg shadow-lg">
+          <label className="block text-sm font-medium mb-2 text-gray-300">
+            Compare with: {comparisonPeriod}
+          </label>
+          <input
+            type="range"
+            min="0"
+            max={allTimePeriods.length - 1}
+            value={getPeriodIndex(comparisonPeriod)}
+            onChange={handleComparisonSliderChange}
+            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500 range-slider-thumb"
+          />
+          <div className="flex justify-between text-xs text-gray-400 mt-1">
+            {allTimePeriods.map((period) => (
+              <span
+                key={period}
+                className="transform -rotate-30 whitespace-nowrap origin-center text-[10px] text-center w-1/${allTimePeriods.length}"
+              >
+                {period.split("-")[0]}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       {/* Comparison Period Controls for Temperature Anomaly */}
       {viewMode === "temp_anomaly" && !climateLoading && allTimePeriods.length > 0 && (
         <div className="mb-6 p-4 bg-gray-800 rounded-lg shadow-lg">
@@ -509,32 +535,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             </ul>
           </div>
         </>
-      )}
-      {/* Comparison Period Slider - only if viewMode is climate_change */}
-      {viewMode === "climate_change" && !climateLoading && allTimePeriods.length > 0 && (
-        <div className="mt-6 p-4 bg-gray-800 rounded-lg shadow-lg">
-          <label className="block text-sm font-medium mb-2 text-gray-300">
-            Compare with: {comparisonPeriod}
-          </label>
-          <input
-            type="range"
-            min="0"
-            max={allTimePeriods.length - 1}
-            value={getPeriodIndex(comparisonPeriod)}
-            onChange={handleComparisonSliderChange}
-            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500 range-slider-thumb"
-          />
-          <div className="flex justify-between text-xs text-gray-400 mt-1">
-            {allTimePeriods.map((period) => (
-              <span
-                key={period}
-                className="transform -rotate-30 whitespace-nowrap origin-center text-[10px] text-center w-1/${allTimePeriods.length}"
-              >
-                {period.split("-")[0]}
-              </span>
-            ))}
-          </div>
-        </div>
       )}
       {/* Coastal Risk Controls */}
       {viewMode === "coastal" && !climateLoading && (
