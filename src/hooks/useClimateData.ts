@@ -9,13 +9,16 @@ interface ClimatePoint {
   [key: string]: number | [number, number];
 }
 
-import type { LineFeatureCollection } from "../types";
+import type { LineFeatureCollection, TemperatureAnomalyDataPoint } from "../types"; // Added TemperatureAnomalyDataPoint
 
 export const useClimateData = () => {
   const [climateData, setClimateData] = useState<ClimatePoint[]>([]);
   const [landBoundaries, setLandBoundaries] = useState<LineFeatureCollection | null>(
     null
   );
+  const [temperatureAnomalyData, setTemperatureAnomalyData] = useState<
+    TemperatureAnomalyDataPoint[]
+  >([]); // New state for anomaly data
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0); // Add progress state
@@ -74,19 +77,30 @@ export const useClimateData = () => {
 
         const { data: climateJson, total: climateTotal } = await loadDataWithProgress<
           ClimatePoint[]
-        >("/data/climate_data_for_globe.json", (loaded, total) =>
-          setProgress(loaded / (total * 2))
+        >(
+          "/data/climate_data_for_globe.json",
+          (loaded, total) => setProgress(loaded / (total * 3)) // Adjusted for three files
         );
         setClimateData(climateJson);
-        if (climateTotal === 0) setProgress(0.5);
+        if (climateTotal === 0) setProgress(1 / 3);
 
         const { data: boundaryJson, total: boundaryTotal } =
           await loadDataWithProgress<LineFeatureCollection>(
             "/data/allLandBoundaries.json",
-            (loaded, total) => setProgress(0.5 + loaded / (total * 2))
+            (loaded, total) => setProgress(1 / 3 + loaded / (total * 3)) // Adjusted for three files
           );
         setLandBoundaries(boundaryJson);
-        if (boundaryTotal === 0) setProgress(1);
+        if (boundaryTotal === 0) setProgress(2 / 3);
+
+        const { data: anomalyJson, total: anomalyTotal } = await loadDataWithProgress<
+          TemperatureAnomalyDataPoint[]
+        >(
+          "/data/temperature_data.json", // Path to the new data file
+          (loaded, total) => setProgress(2 / 3 + loaded / (total * 3)) // Adjusted for three files
+        );
+        setTemperatureAnomalyData(anomalyJson);
+        if (anomalyTotal === 0) setProgress(1);
+
         setLoading(false);
         setProgress(1); // Ensure progress is 100% at the end
       } catch (err) {
@@ -160,6 +174,7 @@ export const useClimateData = () => {
   return {
     climateData,
     landBoundaries,
+    temperatureAnomalyData, // Expose new data
     loading,
     error,
     progress, // Expose progress

@@ -6,10 +6,12 @@ import type { LineFeatureCollection, LineStringFeature } from "./types";
 import type { AppCity, GeoJsonFeature, ViewMode, CityRiskCategory } from "./types";
 import {
   calculateDistance,
-  getTemperatureColor, // Updated import
+  getTemperatureColor,
   getTemperatureChangeColor,
   isTemperatureExtreme,
-  getPointSize, // Added import
+  getPointSize,
+  getPointColor,
+  getPointAltitude,
 } from "./utils/globeUtils";
 import { useWindowDimensions, useCameraAltitude } from "./hooks/useGlobeControls";
 import Sidebar from "./components/Sidebar/Sidebar";
@@ -33,9 +35,10 @@ function App() {
   const {
     climateData,
     landBoundaries,
+    temperatureAnomalyData,
     loading: climateLoading,
     error: climateError,
-    progress, // Get progress from the hook
+    progress,
     timePeriods,
     getTemperatureAtLocation,
     getTemperatureChange,
@@ -99,10 +102,10 @@ function App() {
 
   // Auto-play animation for time periods
   useEffect(() => {
-    let interval: ReturnType<typeof setTimeout>; // Changed NodeJS.Timeout to ReturnType<typeof setTimeout>
+    let interval: ReturnType<typeof setTimeout>;
     if (isPlaying && timePeriods.length > 0) {
       interval = setInterval(() => {
-        setCurrentPeriod((prev) => {
+        setCurrentPeriod((prev: string) => {
           const currentIndex = timePeriods.indexOf(prev);
           const nextIndex = (currentIndex + 1) % timePeriods.length;
           return timePeriods[nextIndex];
@@ -144,19 +147,18 @@ function App() {
     );
   }, [citiesWithRiskCategory]);
 
-  // Enhanced: Use climateData from useClimateData for points on the globe
   const globePointsData = useMemo(() => {
+    if (viewMode === "climate_change") {
+      if (!temperatureAnomalyData || temperatureAnomalyData.length === 0) return [];
+      return temperatureAnomalyData.map((point: any) => ({
+        ...point,
+        color: getPointColor(point.diff),
+        altitude: getPointAltitude(point.diff),
+        size: 0.1,
+      }));
+    }
+
     if (!climateData || Object.keys(climateData).length === 0) return [];
-
-    // Assuming climateData is now an object keyed by period, as in useClimateData.ts
-    // And each period has a 'data' field which is an array of points with lat, lng, and temp_PERIOD
-    // This needs to align with how useClimateData structures its output or how it's processed here.
-    // The provided ClimateGlobe component expects a flat array of points where each point has temp_PERIOD fields.
-    // We will use the getTemperatureAtLocation for each city for the current period for simplicity here.
-    // For a full globe point display like in ClimateGlobe, you'd iterate over a grid or predefined points.
-
-    // This example will show temperatures for the *cities* we already have.
-    // For a dense point layer like in the original ClimateGlobe, you'd need a different data source or processing of the grid data.
     return cities.map((city) => {
       const temp = getTemperatureAtLocation(city.lat, city.lng, currentPeriod);
       return {
@@ -168,9 +170,15 @@ function App() {
         size: getPointSize(temp),
       };
     });
-  }, [cities, currentPeriod, climateData, getTemperatureAtLocation]);
+  }, [
+    cities,
+    currentPeriod,
+    climateData,
+    getTemperatureAtLocation,
+    viewMode,
+    temperatureAnomalyData,
+  ]);
 
-  // Stats calculation based on current globePointsData
   const stats = useMemo(() => {
     if (globePointsData.length === 0) return null;
     const temps = globePointsData
@@ -214,7 +222,7 @@ function App() {
       <div
         style={{
           display: "flex",
-          flexDirection: "column", // Align items vertically
+          flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
           height: "100vh",
@@ -271,8 +279,6 @@ function App() {
 
   return (
     <div className="flex h-screen bg-black">
-      {" "}
-      {/* Added bg-black for consistent theme */}
       <Sidebar
         viewMode={viewMode}
         setViewMode={setViewMode}
@@ -290,13 +296,13 @@ function App() {
         getTemperatureColor={getTemperatureColor}
         getTemperatureChangeColor={getTemperatureChangeColor}
         isTemperatureExtreme={isTemperatureExtreme}
-        // Pass new props for playback and stats
         isPlaying={isPlaying}
         setIsPlaying={setIsPlaying}
         showStats={showStats}
         setShowStats={setShowStats}
-        stats={stats} // Pass calculated stats
-        timePeriods={timePeriods} // Pass all available time periods
+        stats={stats}
+        timePeriods={timePeriods}
+        getPointColor={getPointColor}
       />
       <GlobeDisplay
         globeEl={globeEl}
@@ -310,11 +316,13 @@ function App() {
         getCityRiskCategory={getCityRiskCategory}
         getTemperatureColor={getTemperatureColor}
         getTemperatureChangeColor={getTemperatureChangeColor}
-        // Pass new props for points display
-        pointsData={globePointsData} // Pass the new points data for temperature visualization
-        currentPeriod={currentPeriod} // Pass current period for point labels
+        pointsData={globePointsData}
+        currentPeriod={currentPeriod}
+        temperatureAnomalyData={temperatureAnomalyData}
+        selectedAnomalyComparisonPeriod={comparisonPeriod}
+        getPointColor={getPointColor}
+        getPointAltitude={getPointAltitude}
       />
-      {/* Loading indicator for data updates (optional, if isPlaying causes re-renders often) */}
       {isPlaying && climateLoading && (
         <div
           style={{
@@ -326,7 +334,7 @@ function App() {
             padding: "8px 12px",
             borderRadius: "20px",
             fontSize: "12px",
-            zIndex: 1000, // Ensure it's on top
+            zIndex: 1000,
           }}
         >
           🔄 Animating & Loading...

@@ -26,7 +26,7 @@ export interface AppCity {
   riskCategory?: CityRiskCategory;
 }
 
-export type ViewMode = "coastal" | "temperature" | "climate_change";
+export type ViewMode = "coastal" | "temperature" | "climate_change" | "temp_anomaly"; // Added "temp_anomaly"
 
 export type CityRiskCategory = "submerged" | "at_risk" | "low_risk";
 
@@ -62,4 +62,17 @@ export interface Stats {
   max: number;
   avg: number;
   count: number;
+}
+
+export interface TemperatureAnomalyPeriodData {
+  avg: number;
+  diff: number;
+}
+
+export interface TemperatureAnomalyDataPoint {
+  lat: number;
+  lon: number; // Note: some datasets use 'lon', others 'lng'. Standardize if possible or handle both.
+  periods: {
+    [key: string]: TemperatureAnomalyPeriodData;
+  };
 }

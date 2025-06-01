@@ -26,6 +26,7 @@ interface SidebarProps {
   setShowStats: (show: boolean) => void;
   stats: Stats | null;
   timePeriods: string[];
+  getPointColor?: (diff: number | undefined | null) => string;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -52,6 +53,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   setShowStats,
   stats,
   timePeriods: allTimePeriods, // Renamed to avoid conflict with timePeriods from useClimateData hook
+  getPointColor,
 }) => {
   const {
     loading: climateLoading,
@@ -78,7 +80,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     <div className="w-1/5 bg-gray-900 text-white p-4 overflow-y-auto shadow-2xl scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
       {" "}
       {/* Added scrollbar styling */}
-      <h2 className="text-2xl font-bold mb-6 text-center">🌍 Climate Monitor</h2>
+      <h2 className="text-2xl font-bold mb-6 text-center">Climate Change Dashboard</h2>
       {/* View Mode Selection */}
       <div className="mb-6">
         <label className="block text-sm font-medium mb-2 text-gray-300">View Mode</label>
@@ -93,42 +95,59 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             Coastal Risk
           </button>
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={() => setViewMode("temperature")}
+              className={`px-4 py-2 rounded text-sm font-semibold transition-all duration-150 ease-in-out ${
+                viewMode === "temperature"
+                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+                  : "bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
+              }`}
+            >
+              Global Temperature
+            </button>
+            <button
+              onClick={() => setViewMode("climate_change")}
+              className={`px-4 py-2 rounded text-sm font-semibold transition-all duration-150 ease-in-out ${
+                viewMode === "climate_change"
+                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+                  : "bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
+              }`}
+            >
+              Temperature Change
+            </button>
+          </div>
           <button
-            onClick={() => setViewMode("temperature")}
+            onClick={() => setViewMode("temp_anomaly")}
             className={`px-4 py-2 rounded text-sm font-semibold transition-all duration-150 ease-in-out ${
-              viewMode === "temperature"
-                ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+              viewMode === "temp_anomaly"
+                ? "bg-purple-600 hover:bg-purple-700 text-white shadow-md"
                 : "bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
             }`}
           >
-            Global Temperature
-          </button>
-          <button
-            onClick={() => setViewMode("climate_change")}
-            className={`px-4 py-2 rounded text-sm font-semibold transition-all duration-150 ease-in-out ${
-              viewMode === "climate_change"
-                ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
-                : "bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
-            }`}
-          >
-            Temperature Change
+            Temperature Anomaly
           </button>
         </div>
       </div>
       {/* Loading/Error Indicators */}
-      {(viewMode === "temperature" || viewMode === "climate_change") &&
+      {(viewMode === "temperature" ||
+        viewMode === "climate_change" ||
+        viewMode === "temp_anomaly") && // Added temp_anomaly
         climateLoading && (
           <div className="mb-4 p-3 bg-blue-800 bg-opacity-50 text-blue-300 rounded border border-blue-700">
             Loading climate data...
           </div>
         )}
-      {(viewMode === "temperature" || viewMode === "climate_change") && climateError && (
-        <div className="mb-4 p-3 bg-red-800 bg-opacity-50 text-red-300 rounded border border-red-700">
-          Error: {climateError}
-        </div>
-      )}
+      {(viewMode === "temperature" ||
+        viewMode === "climate_change" ||
+        viewMode === "temp_anomaly") &&
+        climateError && ( // Added temp_anomaly
+          <div className="mb-4 p-3 bg-red-800 bg-opacity-50 text-red-300 rounded border border-red-700">
+            Error: {climateError}
+          </div>
+        )}
       {/* Time Period Controls */}
-      {(viewMode === "temperature" || viewMode === "climate_change") &&
+      {(viewMode === "temperature" || viewMode === "climate_change") && // temp_anomaly will have its own controls
         !climateLoading &&
         allTimePeriods.length > 0 && (
           <div className="mb-6 p-4 bg-gray-800 rounded-lg shadow-lg">
@@ -136,7 +155,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <label className="text-sm font-semibold text-gray-300">
                 Time Period: {currentPeriod}
               </label>
-              <button
+              {/* <button
                 onClick={() => setIsPlaying(!isPlaying)}
                 className={`px-3 py-1.5 rounded text-xs font-bold transition-colors duration-150 ease-in-out shadow-md
                 ${
@@ -146,7 +165,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 } text-white`}
               >
                 {isPlaying ? "⏸️ Pause" : "▶️ Play"}
-              </button>
+              </button> */}
             </div>
             <input
               type="range"
@@ -169,6 +188,35 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         )}
+      {/* Comparison Period Controls for Temperature Anomaly */}
+      {viewMode === "temp_anomaly" && !climateLoading && allTimePeriods.length > 0 && (
+        <div className="mb-6 p-4 bg-gray-800 rounded-lg shadow-lg">
+          <label className="block text-sm font-semibold mb-2 text-gray-300">
+            Comparison Period (vs. 2021-2040): {comparisonPeriod}
+          </label>
+          <input
+            type="range"
+            min="0"
+            max={allTimePeriods.length - 1}
+            value={getPeriodIndex(comparisonPeriod)}
+            onChange={handleComparisonSliderChange}
+            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500 range-slider-thumb"
+          />
+          <div className="flex justify-between text-xs text-gray-400 mt-2">
+            {allTimePeriods.map((period) => (
+              <span
+                key={period}
+                className={`transform -rotate-30 whitespace-nowrap origin-center text-[10px] text-center w-1/${
+                  allTimePeriods.length
+                } ${period === "2021-2040" ? "font-bold text-purple-400" : ""}`}
+              >
+                {period.split("-")[0]}
+              </span>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-2">Baseline: 2021-2040</p>
+        </div>
+      )}
       {/* Statistics Display */}
       {(viewMode === "temperature" || viewMode === "climate_change") &&
         showStats &&
@@ -208,6 +256,39 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         )}
+      {/* Temperature Anomaly Color Legend */}
+      {viewMode === "temp_anomaly" && !climateLoading && (
+        <div className="mb-6 p-3 bg-gray-800 rounded-lg shadow-lg">
+          <div className="text-sm mb-2 font-semibold text-gray-300">
+            🌡️ Temperature Anomaly Scale (°C)
+          </div>
+          <div className="relative w-full h-8 mb-2">
+            <div
+              className="w-full h-full rounded-md shadow-inner"
+              style={{
+                background: `linear-gradient(to right, 
+                  ${getPointColor ? getPointColor(-2) : "grey"}, 
+                  ${getPointColor ? getPointColor(0) : "grey"}, 
+                  ${getPointColor ? getPointColor(0.75) : "grey"}, 
+                  ${getPointColor ? getPointColor(1.5) : "grey"}, 
+                  ${getPointColor ? getPointColor(3.5) : "grey"}, 
+                  ${getPointColor ? getPointColor(6) : "grey"}, 
+                  ${getPointColor ? getPointColor(16) : "grey"}
+                )`,
+              }}
+            ></div>
+            <div className="absolute top-full left-0 w-full flex justify-between text-xs text-gray-400 mt-1">
+              <span>-2°</span>
+              <span>0°</span>
+              <span>+16°</span>
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-500 mt-4">
+            Colors represent the temperature difference compared to the 2021-2040
+            baseline.
+          </p>
+        </div>
+      )}
       {/* Toggle Controls */}
       {(viewMode === "temperature" || viewMode === "climate_change") &&
         !climateLoading && (
