@@ -1,0 +1,14 @@
+{
+  "description": "Climate data processed for globe.gl visualization",
+  "source": "WorldClim 2.1 - ACCESS-CM2 SSP585 scenario",
+  "time_periods": [
+    "2021-2040",
+    "2041-2060",
+    "2061-2080",
+    "2081-2100"
+  ],
+  "data_points": 387,
+  "temperature_unit": "degrees_celsius",
+  "spatial_resolution": "downsampled_from_10_arcminutes",
+  "created": "2025-05-31"
+}
